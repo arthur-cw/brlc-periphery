@@ -11,7 +11,7 @@ import { RescueControlUpgradeable } from "./base/RescueControlUpgradeable.sol";
 import { StoragePlaceholder200 } from "./base/StoragePlaceholder.sol";
 import { ICashbackController } from "./interfaces/ICashbackController.sol";
 
-contract CashbackController is
+abstract contract CashbackController is
     AccessControlUpgradeable,
     PauseControlUpgradeable,
     RescueControlUpgradeable,
@@ -25,6 +25,7 @@ contract CashbackController is
 
     bytes32 public constant CASHBACK_CONTROLLER_ROLE = keccak256("CASHBACK_CONTROLLER_ROLE");
 
+    uint32 cashbackRate = 0;
     // -------------------- Errors -----------------------------------
 
     /// @dev The zero token address has been passed as a function argument.
@@ -32,9 +33,6 @@ contract CashbackController is
 
     /// @dev The recipient is the zero address.
     error ZeroRecipientAddress();
-
-    /// @dev The balance of the contract is less than the cashback amount to be sent.
-    error InsufficientCashbackBalance();
 
     // ------------------- Functions ---------------------------------
 
@@ -64,12 +62,18 @@ contract CashbackController is
         _setupRole(OWNER_ROLE, _msgSender());
     }
 
-    function setCashbackRate()
+    function setCashbackRate(uint32 newRate) external whenNotPaused onlyRole(CASHBACK_CONTROLLER_ROLE) {
+        uint32 oldRate = cashbackRate;
+        cashbackRate = newRate;
+
+        emit SetCashbackRate(oldRate, newRate);
+    }
 
     function sendCashback(
         address token,
         address recipient,
-        uint256 transaction_amount
+        uint256 transactionAmount,
+        bytes16 authorizationId
     ) external whenNotPaused onlyRole(CASHBACK_CONTROLLER_ROLE) {
         if (token == address(0)) {
             revert ZeroTokenAddress();
@@ -78,6 +82,15 @@ contract CashbackController is
             revert ZeroRecipientAddress();
         }
 
-        erc20.safeTransfer(recipient)
+        IERC20Upgradeable erc20 = IERC20Upgradeable(token);
+        uint256 remainderBalance = address(this).balance;
+        uint256 cashbackAmount = transactionAmount * cashbackRate;
+
+        if (remainderBalance < cashbackAmount) {
+            emit CashbackBypassed(authorizationId, cashbackAmount);
+        } else {
+            erc20.safeTransfer(recipient, cashbackAmount);
+            emit SendCashback(token, recipient, cashbackAmount, remainderBalance);
+        }
     }
 }

@@ -5,14 +5,12 @@ pragma solidity 0.8.16;
 interface ICashbackController {
     event SetCashbackRate(uint32 oldRate, uint32 newRate);
 
-    event CashbackBypassed(bytes16 authorizationId, uint256 amount);
-
-    error UnsafeCashbackRate(uint32 proposedRate);
+    event CashbackBypassed(bytes16 authorizationId, uint256 cashbackAmount);
 
     event SendCashback(
         address indexed token,
         address indexed recipient,
-        uint256 transaction_amount,
+        uint256 cashbackAmount,
         uint256 remainderBalance // current balance of the contract after sending the cashback
     );
 
@@ -21,6 +19,6 @@ interface ICashbackController {
     function sendCashback(
         address token,
         address recipient,
-        uint256 transaction_amount
+        uint256 transactionAmount
     ) external;
 }
