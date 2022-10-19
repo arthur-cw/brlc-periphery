@@ -200,7 +200,7 @@ contract PixCashier is
 
         emit CashIn(account, amount, txId);
 
-        if(!IERC20Mintable(_token).mint(account, amount)) {
+        if (!IERC20Mintable(_token).mint(account, amount)) {
             revert TokenMintingFailure();
         }
     }
@@ -216,40 +216,29 @@ contract PixCashier is
      * - The cash-out operation with the provided `txId` must not be already pending.
      */
     function requestCashOut(uint256 amount, bytes32 txId) external whenNotPaused notBlacklisted(_msgSender()) {
-        if (amount == 0) {
-            revert ZeroAmount();
-        }
-        if (txId == 0) {
-            revert ZeroTxId();
-        }
-
-        CashOut storage operation = _cashOuts[txId];
-        CashOutStatus status = operation.status;
-        if (status == CashOutStatus.Pending) {
-            revert InappropriateCashOutStatus(txId, status);
-        }
-
         address sender = _msgSender();
+        _requestCashOut(sender, sender, amount, txId);
+    }
 
-        operation.account = sender;
-        operation.amount = amount;
-        operation.status = CashOutStatus.Pending;
-        _pendingCashOutTxIds.add(txId);
-        uint256 newCashOutBalance = _cashOutBalances[sender] + amount;
-        _cashOutBalances[sender] = newCashOutBalance;
-
-        emit RequestCashOut(
-            sender,
-            amount,
-            newCashOutBalance,
-            txId
-        );
-
-        IERC20Upgradeable(_token).safeTransferFrom(
-            sender,
-            address(this),
-            amount
-        );
+    /**
+     * @dev See {IPixCashier-requestCashOutFrom}.
+     *
+     * Requirements:
+     *
+     * - The contract must not be paused.
+     * - The caller must have the {CASHIER_ROLE} role.
+     * - The provided `amount` and `txId` values must not be zero.
+     * - The cash-out operation with the provided `txId` must not be already pending.
+     */
+    function requestCashOutFrom(
+        address account,
+        uint256 amount,
+        bytes32 txId
+    ) external whenNotPaused onlyRole(CASHIER_ROLE) {
+        if (account == address(0)) {
+            revert ZeroAccount();
+        }
+        _requestCashOut(_msgSender(), account, amount, txId);
     }
 
     /**
@@ -322,6 +311,47 @@ contract PixCashier is
         for (uint256 i = 0; i < len; i++) {
             _processCashOut(txIds[i], CashOutStatus.Reversed);
         }
+    }
+
+    function _requestCashOut(
+        address sender,
+        address account,
+        uint256 amount,
+        bytes32 txId
+    ) internal {
+        if (amount == 0) {
+            revert ZeroAmount();
+        }
+        if (txId == 0) {
+            revert ZeroTxId();
+        }
+
+        CashOut storage operation = _cashOuts[txId];
+        CashOutStatus status = operation.status;
+        if (status == CashOutStatus.Pending) {
+            revert InappropriateCashOutStatus(txId, status);
+        }
+
+        operation.account = account;
+        operation.amount = amount;
+        operation.status = CashOutStatus.Pending;
+        _pendingCashOutTxIds.add(txId);
+        uint256 newCashOutBalance = _cashOutBalances[account] + amount;
+        _cashOutBalances[account] = newCashOutBalance;
+
+        emit RequestCashOut(
+            account,
+            amount,
+            newCashOutBalance,
+            txId,
+            sender
+        );
+
+        IERC20Upgradeable(_token).safeTransferFrom(
+            account,
+            address(this),
+            amount
+        );
     }
 
     function _processCashOut(bytes32 txId, CashOutStatus targetStatus) internal {

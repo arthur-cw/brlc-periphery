@@ -44,15 +44,16 @@ interface IPixCashier is IPixCashierTypes {
 
     /// @dev Emitted when a new cash-out operation is initiated.
     event RequestCashOut(
-        address indexed account, // The account that executes tokens cash-out.
+        address indexed account, // The account that owns the tokens to cash-out.
         uint256 amount,          // The amount of tokens to cash-out.
         uint256 balance,         // The new pending cash-out balance of the account.
-        bytes32 indexed txId     // The off-chain transaction identifier.
+        bytes32 indexed txId,    // The off-chain transaction identifier.
+        address sender           // The account that initiated the cash-out.
     );
 
     /// @dev Emitted when a cash-out operation is confirmed.
     event ConfirmCashOut(
-        address indexed account, // The account that executes tokens cash-out.
+        address indexed account, // The account that owns the tokens to cash-out.
         uint256 amount,          // The amount of tokens to cash-out.
         uint256 balance,         // The new pending cash-out balance of the account.
         bytes32 indexed txId     // The off-chain transaction identifier.
@@ -60,7 +61,7 @@ interface IPixCashier is IPixCashierTypes {
 
     /// @dev Emitted when a cash-out operation is reversed.
     event ReverseCashOut(
-        address indexed account, // The account that executes tokens cash-out.
+        address indexed account, // The account that owns the tokens to cash-out.
         uint256 amount,          // The amount of tokens to cash-out.
         uint256 balance,         // The new pending cash-out balance of the account.
         bytes32 indexed txId     // The off-chain transaction identifier.
@@ -146,6 +147,24 @@ interface IPixCashier is IPixCashierTypes {
      * @param txId The off-chain transaction identifier of the operation.
      */
     function requestCashOut(uint256 amount, bytes32 txId) external;
+
+    /**
+     * @dev Initiates a cash-out operation from some other account.
+     *
+     * Transfers tokens from the account to the contract.
+     * This function can be called by a limited number of accounts that are allowed to process cash-out operations.
+     *
+     * Emits a {CashOut} event.
+     *
+     * @param account The account on that behalf the operation is made.
+     * @param amount The amount of tokens to be cash-outed.
+     * @param txId The off-chain transaction identifier of the operation.
+     */
+    function requestCashOutFrom(
+        address account,
+        uint256 amount,
+        bytes32 txId
+    ) external;
 
     /**
      * @dev Confirms a single cash-out operation.
